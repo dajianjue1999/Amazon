@@ -1,0 +1,177 @@
+---
+title: "Daoyang E homework2"
+author: "Daoyang E"
+date: "7/28/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(csv)
+library(dplyr)
+library(tidyverse)
+library(corrplot)
+library(caret)
+library(rpart)
+library(party)
+library(ada)
+library(plyr)
+library(e1071)
+library(mice)
+library(mltools)
+library(data.table)
+library(molaR)
+```
+### Data Cleaning
+
+```{r}
+training <- read.csv("C:/Users/edaoy/Desktop/intern/homework/Training.csv")
+Training <- read.csv("C:/Users/edaoy/Desktop/intern/homework/Training.csv")
+Test <- read.csv("C:/Users/edaoy/Desktop/intern/homework/Test.csv")
+summary(Training)
+str(Training)
+```
+
+```{r}
+training$score1 <- training$score1%>%as.numeric()
+training$score2 <- training$score2%>%as.numeric()
+training$score3 <- training$score3%>%as.numeric()
+training$score4 <- training$score4%>%as.numeric()
+training$score5 <- training$score5%>%as.numeric()
+training$contact_type <- training$contact_type%>%as.numeric()
+training$ID <- training$ID%>%as.numeric()
+Test$score1 <- Test$score1%>%as.numeric()
+Test$score2 <- Test$score2%>%as.numeric()
+Test$score3 <- Test$score3%>%as.numeric()
+Test$score4 <- Test$score4%>%as.numeric()
+Test$score5 <- Test$score5%>%as.numeric()
+Test$contact_type <- Test$contact_type%>%as.numeric()
+```
+### Question 1
+
+```{r}
+for(i in 12:16) {
+  training[ , i][is.na(training[ , i])] <- mean(training[ , i], na.rm = TRUE)
+}
+for(j in 11:15) {
+  Test[ , j][is.na(Test[ , j])] <- mean(Test[ , j], na.rm = TRUE)
+}
+```
+
+### Question 2
+
+```{r}
+for(n in 3:10) {
+  training[ , n][training[ , n]=="null"] <- "Not Specified"
+}
+for(m in 2:9) {
+  Test[ , m][Test[ , m]=="null"] <- "Not Specified"
+}
+training$contact_type[is.na(training$contact_type)]<-mean(training$contact_type,na.rm = TRUE)
+Test$contact_type[is.na(Test$contact_type)]<-mean(Test$contact_type,na.rm = TRUE)
+```
+
+The reason we did not impute issue labels with variable is because these issue labels are composed of categorical characters, in which, once numerical variables are imputed, would lead to difference in the label columns. Concerning contact_type, the best imputation I could think of would be the mean imputation. The reason behind is that contact_type is composed of two numerical variables, and the mean imputation would lead to a third numerical variable which could stand for "NA valus" but would not make any real missing value appear on the dataframe.
+
+```{r}
+dmy <- dummyVars(" ~ .", data = training)
+trsf <- data.frame(predict(dmy, newdata = training))
+```
+
+```{r}
+Testdmy <- dummyVars(" ~ .", data = Test)
+Testtrsf <- data.frame(predict(Testdmy, newdata = Test))
+```
+
+### Question 3
+
+```{r}
+varnames <- c("score1", "score2", "score3","score4","score5","contact_type","day","hour")
+index <- names(trsf) %in% varnames
+temp <- scale(trsf[, index])
+trsf[, index] <- temp
+Testindex <- names(Testtrsf) %in% varnames
+Testtemp <- scale(Testtrsf[, Testindex])
+Testtrsf[, Testindex] <- Testtemp
+```
+
+### Question 4
+
+```{r}
+trsf$response[trsf$response==0]<-"answered"
+trsf$response[trsf$response==1]<-"unanswered"
+```
+
+```{r}
+ctrl <- trainControl(
+  method = "cv", 
+  number = 3
+)
+
+
+set.seed(123)
+glm_mod <- train(
+  response ~ .,
+  data = trsf,
+  method = "glm",
+  family = "binomial",
+  trControl = ctrl)
+
+glm_mod
+```
+```{r}
+varImp(glm_mod)
+```
+
+```{r}
+confusionMatrix(glm_mod)
+```
+
+```{r}
+P<-82.2/(82.2+9.2)
+R<-82.2/(82.2+7)
+F1<-2*P*R/(P+R)
+F1
+```
+
+### Question 5
+
+If I want to reduce the dimensionality of the one-hot encoded features, I would like to reduce the number of features introduced by one-hot encoding. Maybe there would be variables in the one-hot encoded features that shows strong relationships could be regrouped to the same group. 
+
+```{r}
+stats::kmeans(trsf[,index], centers = 5, nstart = 10)
+```
+
+
+Concerning current encoding of day and hour, I think they are reasonable since they exhibit ordinal relationship, i.e. between them there resides a sequence. The current time sequence is already good enough to me.
+
+There might be outliers, so there could be some methods used to clean out the outliers in the scores. 
+
+
+
+Maybe decision tree or random forest could serve a better job.\
+
+```{r}
+cvCtrl <- trainControl(method = "repeatedcv",
+                       repeats = 3,
+                       classProbs = TRUE,
+                       summaryFunction = twoClassSummary)
+
+set.seed(107)
+
+model <- train(response~., 
+                data=trsf,
+                method = "ctree",
+                na.action = na.pass,
+                trControl = cvCtrl,
+                metric = "ROC")
+model
+```
+
+```{r}
+confusionMatrix(model)
+```
+

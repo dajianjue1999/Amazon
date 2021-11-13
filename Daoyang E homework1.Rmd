@@ -1,0 +1,335 @@
+---
+title: "homework1"
+author: "Daoyang E"
+date: "7/20/2020"
+output:
+  html_document:
+    toc: yes
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(csv)
+library(dplyr)
+library(tidyverse)
+library(corrplot)
+library(caret)
+library(rpart)
+library(party)
+library(ada)
+library(plyr)
+library(e1071)
+```
+## data cleaning
+
+```{r}
+training <- read.csv("C:/Users/edaoy/Desktop/intern/homework/Training.csv")
+Training <- read.csv("C:/Users/edaoy/Desktop/intern/homework/Training.csv")
+Test <- read.csv("C:/Users/edaoy/Desktop/intern/homework/Test.csv")
+summary(Training)
+str(Training)
+```
+
+## Question1 coding
+
+```{r}
+#number of "null" response
+Training %>% filter(Training$response=="null")%>%nrow()
+
+#number of "null" IL1
+Training %>% filter(Training$IL1=="null")%>%nrow()
+
+#number of "null" IL2
+Training %>% filter(Training$IL2=="null")%>%nrow()
+
+#number of "null" IL3
+Training %>% filter(Training$IL3=="null")%>%nrow()
+
+#number of "null" IL4
+Training %>% filter(Training$IL4=="null")%>%nrow()
+
+#number of "null" CIL1
+Training %>% filter(Training$CIL1=="null")%>%nrow()
+
+#number of "null" CIL2
+Training %>% filter(Training$CIL2=="null")%>%nrow()
+
+#number of "null" CIL3
+Training %>% filter(Training$CIL3=="null")%>%nrow()
+
+#number of "null" CLI4
+Training %>% filter(Training$CLI4=="null")%>%nrow()
+
+#number of "null" prime
+Training %>% filter(Training$prime=="null")%>%nrow()
+
+#number of "null" score1
+Training %>% filter(Training$score1=="null")%>%nrow()
+
+#number of "null" score2
+Training %>% filter(Training$score2=="null")%>%nrow()
+
+#number of "null" score3
+Training %>% filter(Training$score3=="null")%>%nrow()
+
+#number of "null" score4
+Training %>% filter(Training$score4=="null")%>%nrow()
+
+#number of "null" score5
+Training %>% filter(Training$score5=="null")%>%nrow()
+
+#number of "null" contact_type
+Training %>% filter(Training$contact_type=="null")%>%nrow()
+
+#number of "null" day
+Training %>% filter(Training$day=="null")%>%nrow()
+
+#number of "null" hour
+Training %>% filter(Training$hour=="null")%>%nrow()
+
+#number of "null" device
+Training %>% filter(Training$device=="null")%>%nrow()
+```
+
+
+```{r}
+training$score1 <- training$score1%>%as.numeric()
+training$score2 <- training$score2%>%as.numeric()
+training$score3 <- training$score3%>%as.numeric()
+training$score4 <- training$score4%>%as.numeric()
+training$score5 <- training$score5%>%as.numeric()
+training$ID <- training$ID%>%as.numeric()
+Test$score1 <- Test$score1%>%as.numeric()
+Test$score2 <- Test$score2%>%as.numeric()
+Test$score3 <- Test$score3%>%as.numeric()
+Test$score4 <- Test$score4%>%as.numeric()
+Test$score5 <- Test$score5%>%as.numeric()
+```
+
+```{r}
+training$response[training$response==0]<-"answered"
+training$response[training$response==1]<-"unanswered"
+training$prime[training$prime==0]<-"not_prime"
+training$prime[training$prime==1]<-"prime"
+Test$prime[Test$prime==0]<-"not——prime"
+Test$prime[Test$prime==1]<-"prime"
+``` 
+
+
+```{r}
+summary(training)
+```
+
+## Question1 answer
+I notice that score1,score2,score3,score4,score5 would count as numerical data, while response, IL1,IL2,IL3,IL4,CIL1,CIL2,CIL3,CLI4,prime,contact_type,day, hour and device would count as categorical data.
+
+The columns that does not contain missing value is response, prime, day, hour and device.
+
+## Question2 coding
+
+```{r}
+ggplot(data = training, aes(x = score1))+
+  geom_bar(width = 0.1)+
+  ggtitle("score1 histogram")+
+  facet_grid(~response)
+```
+
+```{r}
+ggplot(data = training, aes(x = score2))+
+  geom_bar(width = 0.05)+
+  ggtitle("score2 histogram")+
+  facet_grid(~response)
+```
+
+```{r}
+ggplot(data = training, aes(x = score3))+
+  geom_bar(width = 5)+
+  ggtitle("score3 histogram")+
+  facet_grid(~response)
+```
+
+```{r}
+ggplot(data = training, aes(x = score4))+
+  geom_bar(width = 5)+
+  ggtitle("score4 histogram")+
+  facet_grid(~response)
+```
+
+```{r}
+ggplot(data = training, aes(x = score5))+
+  geom_bar(width = 5)+
+  ggtitle("score5 histogram")+
+  facet_grid(~response)
+```
+
+IL1 category
+```{r}
+(IL1_category<-count(training, vars = "IL1"))
+```
+
+IL2 category
+```{r}
+(IL2_category<-count(training, vars = "IL2"))
+```
+
+IL3 category
+```{r}
+(IL3_category<-count(training, vars = "IL3"))
+```
+
+IL4 category
+```{r}
+(IL4_category<-count(training, vars = "IL4"))
+```
+
+CIL1 category
+```{r}
+(CIL1_category<-count(training, vars = "CIL1"))
+```
+
+CIL2 category
+```{r}
+(CIL2_category<-count(training, vars = "CIL2"))
+```
+
+CIL3 category
+```{r}
+(CIL3_category<-count(training, vars = "CIL3"))
+```
+
+CLI4 category
+```{r}
+(CLI4_category<-count(training, vars = "CLI4"))
+```
+
+contact type category
+```{r}
+(contact_type_category<-count(training, vars = "contact_type"))
+```
+
+response category
+```{r}
+(response_category<-count(training, vars = "response"))
+```
+
+prime category
+```{r}
+(prime_category<-count(training, vars = "prime"))
+```
+
+day category
+```{r}
+(day_category<-count(training, vars = "day"))
+```
+
+hour category
+```{r}
+(hour_category<-count(training, vars = "hour"))
+```
+
+device category
+```{r}
+(device_category<-count(training, vars = "device"))
+```
+
+
+## Question2 answer
+the categories of categorical variable are listed above. And the histograms for the numerical variables are also listed. COncerning the histograms of numerical variables, I would say that score1, score3, score4, score5 exhibit similar pattern with high values on the end and several values in the middle, while score2 exhibit a histogram that shows relatively more values in the middle, which makes its difference from other scores. Generally speaking, I think the score histograms are similar for answered and unanswered customers.
+
+## Question3 coding
+
+```{r}
+mydata <- training%>%select(score1,score2,score3,score4,score5)
+traindata <- training%>%select(score1,score2,score3,score4,score5,prime)
+(res<-cor(mydata,use="pairwise.complete.obs"))
+testdata<-Test%>%select(score1,score2,score3,score4,score5,prime)
+```
+
+```{r}
+corrplot(res, type = "upper", 
+         tl.col = "black", tl.srt = 45)
+```
+
+```{r}
+pairs(mydata, pch = 19, lower.panel = NULL)
+```
+
+## Question3 answer
+According to the above correlation matrix plot and scatter matrix plot, I get the conclusion that only score2 exhibits a relatively strong correlation with score 3. Any other pair of numerical data shows no such correlation.
+
+## Question4 answer
+An important indicator for categorical data would be the confusion matrix, which includes four major categories, True Positive(TP), False Negative(FN), False Positive(FP) and True Negative(TN). And concerning these four types, there exist several measuring metrics, which is Accuracy, Precision, Recall and F-1 score. Precision considers the proportion of positive predictions that are actually correct, while recall considers the proportion of correct set that are identified as positive. We would like to consider more on the class of FN, we want to lower the occurrence of FN. So we make a harmonic combination of Precision and Recall, which results in F-1 score. F-1 score would best balance our aim at make a model of higher precision and not get an over-fitting model.
+
+
+## Question 5 coding
+
+### conditional Inference Tree
+
+```{r}
+cvCtrl <- trainControl(method = "repeatedcv",
+                       repeats = 3,
+                       classProbs = TRUE,
+                       summaryFunction = twoClassSummary)
+
+set.seed(107)
+
+model <- train(prime~., 
+                data=traindata,
+                method = "ctree",
+                na.action = na.pass,
+                trControl = cvCtrl,
+                metric = "ROC")
+model
+```
+
+```{r}
+ggplot(model)
+```
+```{r}
+treeclass <- predict(model, newdata = testdata)
+str(treeclass)
+
+treeprobs<- predict(model, newdata = testdata, type = "prob")
+head(treeprobs)
+```
+
+### Boosted Classification Tree
+
+
+```{r}
+treectrl <- trainControl(
+  method = "repeatedcv", 
+  repeats = 3,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary
+)
+
+treegrid <- expand.grid(iter = 30, maxdepth = 10, nu = 0.1)
+
+set.seed(123)
+treeplsFit <- train(
+  prime ~ .,
+  data = traindata,
+  method = "ada",
+  tuneGrid = treegrid,
+  trControl = treectrl,
+  na.action = na.pass,
+  metric = "ROC")
+
+treeplsFit
+```
+
+```{r}
+adatreeclass <- predict(treeplsFit, newdata = testdata)
+str(adatreeclass)
+
+adatreeprobs<- predict(treeplsFit, newdata = testdata, type = "prob")
+head(adatreeprobs)
+```
+
+

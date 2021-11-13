@@ -1,0 +1,349 @@
+---
+title: "DaoyangE homework3"
+author: "Daoyang E"
+date: "8/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(csv)
+library(dplyr)
+library(tidyverse)
+library(corrplot)
+library(caret)
+library(rpart)
+library(party)
+library(ada)
+library(plyr)
+library(e1071)
+library(mice)
+library(mltools)
+library(data.table)
+library(molaR)
+library(pipeliner)
+library(superml)
+library(forcats)
+```
+
+```{r}
+training <- read.csv("C:/Users/edaoy/Desktop/intern/homework/Training.csv")
+Test <- read.csv("C:/Users/edaoy/Desktop/intern/homework/Test.csv")
+```
+
+```{r}
+training$score1 <- training$score1%>%as.numeric()
+training$score2 <- training$score2%>%as.numeric()
+training$score3 <- training$score3%>%as.numeric()
+training$score4 <- training$score4%>%as.numeric()
+training$score5 <- training$score5%>%as.numeric()
+training$contact_type <- training$contact_type%>%as.numeric()
+training$ID <- training$ID%>%as.numeric()
+Test$score1 <- Test$score1%>%as.numeric()
+Test$score2 <- Test$score2%>%as.numeric()
+Test$score3 <- Test$score3%>%as.numeric()
+Test$score4 <- Test$score4%>%as.numeric()
+Test$score5 <- Test$score5%>%as.numeric()
+Test$contact_type <- Test$contact_type%>%as.numeric()
+```
+
+```{r}
+for(n in 3:10) {
+  training[ , n][training[ , n]=="null"] <- "Not Specified"
+}
+training[,"contact_type"][training[,"contact_type"]==0]<-"0"
+training[,"contact_type"][training[,"contact_type"]==4]<-"4"
+training[,"contact_type"][is.na(training[,"contact_type"])]<-"null"
+for(m in 2:9) {
+  Test[ , m][Test[ , m]=="null"] <- "Not Specified"
+}
+Test[,"contact_type"][Test[,"contact_type"]==0]<-"0"
+Test[,"contact_type"][Test[,"contact_type"]==4]<-"4"
+Test[,"contact_type"][is.na(Test[,"contact_type"])]<-"null"
+```
+
+```{r}
+Test[,"response"]<- NA
+```
+
+```{r}
+set.seed(107)
+inTrain <- createDataPartition(
+  y = training$response,
+  p = .75,
+  list = FALSE
+)
+trainset <- training[ inTrain,]
+validset  <- training[-inTrain,]
+```
+
+
+```{r}
+for(i in 12:16) {
+  trainset[ , i][is.na(trainset[ , i])] <- mean(trainset[ , i], na.rm = TRUE)
+}
+for(k in 12:16) {
+  validset[ , i][is.na(validset[ , i])] <- mean(validset[ , i], na.rm = TRUE)
+}
+for(j in 11:15) {
+  Test[ , i][is.na(Test[ , j])] <- mean(Test[ , j], na.rm = TRUE)
+}
+```
+
+
+```{r}
+combi <- rbind(trainset,validset,Test)
+```
+
+```{r}
+my_data <- subset(combi, select = -c(ID, response))
+```
+
+```{r}
+str(my_data)
+```
+
+
+```{r}
+library(dummies)
+```
+new_my_data <- dummy.data.frame(my_data, names = c("IL1","IL2",
+                                "IL3","IL4",
+                                "CIL1","CIL2","CIL3","CLI4","contact_type","device"))
+
+```{r}
+new_my_data <- dummy.data.frame(my_data)
+```
+
+
+```{r}
+pca.trainset <- new_my_data[1:nrow(trainset),]
+pca.validset <- new_my_data[nrow(trainset)+1:nrow(training),]
+pca.testset <- new_my_data[-(1:nrow(training)),]
+```
+
+
+
+//```{r}
+pca.trainset<-pca.trainset[ , which(apply(pca.trainset, 2, var) != 0)]
+//```
+
+pca.testset<-pca.testset[ , which(apply(pca.testset, 2, var) != 0)]
+pca.validset<-pca.validset[ , which(apply(pca.validset, 2, var) != 0)]
+
+
+```{r}
+prin_comp <- prcomp(pca.trainset,center = T)
+```
+
+
+```{r}
+str(prin_comp)
+```
+
+
+```{r}
+view(prin_comp$x)
+```
+
+```{r}
+std_dev <- prin_comp$sdev
+pr_var <- std_dev^2
+pr_var[1:10]
+```
+
+```{r}
+prop_varex <- pr_var/sum(pr_var)
+prop_varex[1:20]
+```
+
+```{r}
+plot(prop_varex, xlab = "Principal Component",
+             ylab = "Proportion of Variance Explained",
+             type = "b")
+```
+
+```{r}
+plot(cumsum(prop_varex), xlab = "Principal Component",
+              ylab = "Cumulative Proportion of Variance Explained",
+              type = "b")
+```
+
+
+```{r}
+train.data<-data.frame(response=trainset$response,prin_comp$x)
+```
+
+```{r}
+train.data<-train.data[,1:20]
+```
+
+```{r}
+train.data$response[train.data$response==0]<-"question_answered"
+train.data$response[train.data$response==1]<-"question_not_answered"
+validset$response[validset$response==0]<-"question_answered"
+validset$response[validset$response==1]<-"question_not_answered"
+```
+
+```{r}
+summary(train.data)
+```
+
+```{r}
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+set.seed(3333)
+dtree_fit <- train(response ~., data = train.data, method = "rpart",
+                   parms = list(split = "information"),
+                   trControl=trctrl,
+                   tuneLength = 10)
+
+```
+
+```{r}
+dtree_fit
+```
+
+
+```{r}
+orivalid.data <- predict(prin_comp, newdata = pca.validset)
+```
+
+
+```{r}
+valid.data <- as.data.frame(orivalid.data)
+valid.data <- valid.data[,1:20]
+valid_model <- predict(dtree_fit, newdata = valid.data)
+```
+
+```{r}
+str(valid.data)
+```
+
+
+```{r}
+summary(valid_model)
+```
+
+
+```{r}
+varImp <- function(object, surrogates = FALSE, competes = TRUE, ...)
+  {
+tmp <- rownames(object$splits)
+
+ allVars <- colnames(attributes(object$terms)$factors)
+if(is.null(tmp))
+  {
+  out<-NULL
+    zeros <- data.frame(x = rep(0, length(allVars)),
+                        Variable = allVars)
+    out <- rbind(out, zeros)
+  }
+
+else {
+
+rownames(object$splits) <- 1:nrow(object$splits)
+splits <- data.frame(object$splits)
+    splits$var <- tmp
+splits$type <- ""
+
+frame <- as.data.frame(object$frame)
+    index <- 0
+    for(i in 1:nrow(frame))
+      {
+        if(frame$var[i] != "<leaf>")
+          {
+            index <- index + 1
+            splits$type[index] <- "primary"
+            if(frame$ncompete[i] > 0)
+              {
+                for(j in 1:frame$ncompete[i])
+                  {
+                    index <- index + 1
+                    splits$type[index] <- "competing"
+                  }
+              }
+            if(frame$nsurrogate[i] > 0)
+              {
+                for(j in 1:frame$nsurrogate[i])
+                  {
+                    index <- index + 1
+                    splits$type[index] <- "surrogate"
+                  }
+              }
+          }
+      }
+    splits$var <- factor(as.character(splits$var))
+    if(!surrogates) splits <- subset(splits, type != "surrogate")
+    if(!competes) splits <- subset(splits, type != "competing")
+    out <- aggregate(splits$improve,
+                 list(Variable = splits$var),
+                 sum,
+                 na.rm = TRUE)
+
+allVars <- colnames(attributes(object$terms)$factors)
+if(!all(allVars %in% out$Variable))
+      {
+        missingVars <- allVars[!(allVars %in% out$Variable)]
+        zeros <- data.frame(x = rep(0, length(missingVars)),
+                            Variable = missingVars)
+        out <- rbind(out, zeros)
+      }
+    }
+    out2 <- data.frame(Overall = out$x)
+rownames(out2) <- out$Variable
+out2
+}
+```
+
+```{r}
+(variableimport<- varImp(dtree_fit))
+a<-c('PC1','PC2','PC3','PC4','PC5','PC6','PC7','PC8','PC9','PC10','PC11','PC12','PC13','PC14','PC15','PC16','PC17','PC18','PC19')
+names(a)<-c('rowname')
+a
+varimp<-cbind(a,variableimport)
+```
+
+```{r}
+names(varimp)[1] <- "PCA"
+names(varimp)[2] <- "feature_importance"
+ggplot(varimp) +
+  geom_col(aes(x = PCA, y = feature_importance),
+           col = "black", show.legend = F) +
+  coord_flip() +
+  scale_fill_grey() +
+  theme_bw()
+```
+
+```{r}
+dtree_fit$results
+```
+
+```{r}
+dtree_fit$pred
+```
+
+```{r}
+dtree_fit$resample
+```
+
+
+```{r}
+dtree_fit$bestTune
+```
+
+```{r}
+dtree_fit$pred[dtree_fit$pred$Resample=="Fold1",4:5]
+dtree_fit$pred[dtree_fit$pred$Resample=="Fold2",4:5]
+dtree_fit$pred[dtree_fit$pred$Resample=="Fold3",4:5]
+dtree_fit$pred[dtree_fit$pred$Resample=="Fold4",4:5]
+```
+
+```{r}
+plot(dtree_fit)
+```
+
+
